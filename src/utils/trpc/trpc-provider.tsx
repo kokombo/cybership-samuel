@@ -16,10 +16,7 @@ const TrpcProvider = ({ children }: { children: React.ReactNode }) => {
     trpc.createClient({
       links: [
         httpBatchLink({
-          url:
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:3000/api/trpc"
-              : `${process.env.VERCEL_URL}/api/trpc`,
+          url: `${process.env.VERCEL_URL}/api/trpc`,
         }),
       ],
     })
