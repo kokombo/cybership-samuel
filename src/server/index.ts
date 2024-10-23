@@ -1,40 +1,41 @@
 import { publicProcedure, router } from "./trpc";
 import { prisma } from "@/utils/prisma";
 import { $Enums } from "@prisma/client";
-import * as Yup from "yup";
+import { z } from "zod";
 
 export const appRouter = router({
   getOrders: publicProcedure
     .input(
-      Yup.object({
-        limit: Yup.number().min(1),
-        status: Yup.mixed<$Enums.FulfilmentStatus>().oneOf(
-          Object.values($Enums.FulfilmentStatus)
-        ),
-        cursor: Yup.string(),
+      z.object({
+        limit: z.number().default(50),
+        status: z.nativeEnum($Enums.FulfilmentStatus).optional(),
+        page: z.number().min(1).default(1),
       })
     )
     .query(async ({ input }) => {
-      const limit = input.limit ?? 50;
-      const { cursor, status } = input;
+      const { page, status, limit } = input;
+
+      const skip = (page - 1) * limit;
 
       const orders = await prisma.order.findMany({
-        take: limit + 1,
+        skip,
+        take: limit,
         where: status ? { status } : undefined,
-        cursor: cursor ? { id: cursor } : undefined,
         orderBy: { createdAt: "desc" },
+        include: {
+          items: true,
+        },
       });
 
-      let nextCursor: string | undefined = undefined;
-
-      if (orders.length > limit) {
-        const nextItem = orders.pop();
-        nextCursor = nextItem?.id;
-      }
+      const totalOrders = await prisma.order.count({
+        where: status ? { status } : undefined,
+      });
 
       return {
         orders,
-        nextCursor,
+        totalOrders,
+        currentPage: page,
+        totalPages: Math.ceil(totalOrders / limit),
       };
     }),
 });
