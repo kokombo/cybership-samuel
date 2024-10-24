@@ -114,7 +114,7 @@ const OrderTable = () => {
   });
 
   const scrollTop = useCallback(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, left: 0 });
   }, []);
 
   const debouncedSetPage = useMemo(
@@ -152,7 +152,7 @@ const OrderTable = () => {
           </Button>
         </div>
       ) : (
-        <>
+        <div>
           <div className="flex justify-end mb-4">
             <Select
               value={status ?? "All"}
@@ -222,8 +222,8 @@ const OrderTable = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  table.previousPage();
                   scrollTop();
+                  table.previousPage();
                 }}
                 disabled={!table.getCanPreviousPage() || getOrders.isFetching}
               >
@@ -233,8 +233,8 @@ const OrderTable = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  table.nextPage();
                   scrollTop();
+                  table.nextPage();
                 }}
                 disabled={!table.getCanNextPage() || getOrders.isFetching}
               >
@@ -296,7 +296,7 @@ const OrderTable = () => {
               </Select>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
