@@ -7,7 +7,7 @@ export const appRouter = router({
   getOrders: publicProcedure
     .input(
       z.object({
-        limit: z.number().default(50),
+        limit: z.number().default(20),
         status: z.nativeEnum($Enums.FulfilmentStatus).optional(),
         page: z.number().min(1).default(1),
       })
