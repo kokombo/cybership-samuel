@@ -75,4 +75,7 @@ body {
   body {
     @apply bg-background text-foreground min-w-[1000px] overflow-auto;
   }
+  html {
+    @apply scroll-smooth;
+  }
 }

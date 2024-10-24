@@ -1,7 +1,7 @@
 "use client";
 
 import { $Enums, type Order, type OrderItem } from "@prisma/client";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Select,
   SelectContent,
@@ -20,6 +20,9 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { trpc } from "@/utils/trpc/client";
+import Loader from "./loader";
+import { cn } from "@/lib/utils";
+import { debounce } from "ts-debounce";
 
 interface ExtendedOrder extends Order {
   items: Array<OrderItem>;
@@ -29,24 +32,39 @@ const columnHelper = createColumnHelper<ExtendedOrder>();
 
 const tableColumns = [
   columnHelper.accessor("createdAt", {
-    cell: (info) => new Date(info.getValue()).toLocaleString(),
+    cell: (info) => info.getValue().toLocaleString(),
     header: () => "Date",
   }),
   columnHelper.accessor("customer", {
     cell: (info) => info.getValue(),
-    header: () => "Customer Name",
+    header: () => "Customer",
   }),
   columnHelper.accessor("address", {
     cell: (info) => info.getValue(),
     header: () => "Address",
   }),
   columnHelper.accessor("status", {
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <span
+        className={cn(
+          "font-semibold capitalize",
+          info.getValue() === "FULFILLED"
+            ? "text-green-600"
+            : info.getValue() === "SHIPPED"
+            ? "text-purple-600"
+            : info.getValue() === "PENDING"
+            ? "text-blue-600"
+            : "text-red-600"
+        )}
+      >
+        {info.getValue().toLowerCase()}
+      </span>
+    ),
     header: () => "Status",
   }),
   columnHelper.accessor("items", {
     cell: (info) => (
-      <ul>
+      <ul className="list-disc">
         {info.getValue().map((item) => (
           <li key={item.id}>{item.name} </li>
         ))}{" "}
@@ -95,18 +113,32 @@ const OrderTable = () => {
     manualPagination: true,
   });
 
-  const scrollTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const scrollTop = useCallback(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, []);
+
+  const debouncedSetPage = useMemo(
+    () =>
+      debounce((page: number) => {
+        table.setPageIndex(page);
+        scrollTop();
+      }, 1000),
+    [table, scrollTop]
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6">
       {getOrders.isFetching && !getOrders.isLoading && (
-        <div className="fixed top-4 left-4">loading...</div>
+        <div className="fixed left-4 top-4">
+          <Loader width="40" height="40" />
+        </div>
       )}
 
       {getOrders.isLoading ? (
-        <div className="h-full grid justify-items-center mt-12">Loading...</div>
+        <div className="h-full grid justify-items-center mt-12">
+          <Loader height="80" width="80" />
+          <span>Loading...</span>
+        </div>
       ) : getOrders.isError ? (
         <div className="h-full flex flex-col items-center justify-center text-center gap-2 mt-12">
           <p>Something went wrong, please try again</p>
@@ -114,7 +146,7 @@ const OrderTable = () => {
           <Button
             onClick={() => getOrders.refetch()}
             className="ml-2"
-            disabled={getOrders.isLoading}
+            disabled={getOrders.isFetching}
           >
             Try again
           </Button>
@@ -123,22 +155,27 @@ const OrderTable = () => {
         <>
           <div className="flex justify-end mb-4">
             <Select
-              value={status}
+              value={status ?? "All"}
               onValueChange={(value) =>
                 setStatus(
-                  value === "all"
+                  value === "All"
                     ? undefined
                     : (value as $Enums.FulfilmentStatus)
                 )
               }
+              disabled={getOrders.isFetching}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-40 capitalize">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="All">All</SelectItem>
                 {Object.values($Enums.FulfilmentStatus).map((status, index) => (
-                  <SelectItem key={index.toString()} value={status}>
+                  <SelectItem
+                    key={index.toString()}
+                    value={status}
+                    className="capitalize"
+                  >
                     {status.toLowerCase()}
                   </SelectItem>
                 ))}
@@ -214,7 +251,7 @@ const OrderTable = () => {
             </div>
 
             <div className="flex gap-2 items-center">
-              <span>Go to:</span>
+              <span>Go to page</span>
 
               <Input
                 type="number"
@@ -222,10 +259,15 @@ const OrderTable = () => {
                 max={table.getPageCount()}
                 defaultValue={table.getState().pagination.pageIndex + 1}
                 onChange={(e) => {
-                  const page = e.target.value ? Number(e.target.value) - 1 : 0;
-                  table.setPageIndex(page);
-                  scrollTop();
+                  const page = e.target.value
+                    ? Math.min(
+                        Number(e.target.value) - 1,
+                        table.getPageCount() - 1
+                      )
+                    : 0;
+                  debouncedSetPage(page);
                 }}
+                disabled={getOrders.isFetching}
                 className="w-16"
               />
             </div>
@@ -239,6 +281,7 @@ const OrderTable = () => {
                   table.setPageSize(Number(value));
                   scrollTop();
                 }}
+                disabled={getOrders.isFetching}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="10" />
